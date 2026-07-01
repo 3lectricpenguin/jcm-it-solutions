@@ -268,7 +268,9 @@ import Layout from '../layouts/Layout.astro';
 
   async function fetchScores() {
     try {
-      const res = await fetch(BIN_URL);
+      const res = await fetch(`${BIN_URL}?nocache=${Date.now()}`, {
+        cache: 'no-store'
+      });
       if (!res.ok) throw new Error('Failed to fetch leaderboard data');
       const data = await res.json();
       if (Array.isArray(data)) {
@@ -281,7 +283,8 @@ import Layout from '../layouts/Layout.astro';
           await fetch(BIN_URL, {
             method: 'PUT',
             headers: {
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              'Cache-Control': 'no-cache'
             },
             body: JSON.stringify(updatedScores)
           });
@@ -294,7 +297,9 @@ import Layout from '../layouts/Layout.astro';
 
   async function saveScore(name: string, points: number, time: number, solvedCount: number) {
     try {
-      const res = await fetch(BIN_URL);
+      const res = await fetch(`${BIN_URL}?nocache=${Date.now()}`, {
+        cache: 'no-store'
+      });
       if (!res.ok) throw new Error('Failed to fetch current scores');
       let currentScores: Hacker[] = await res.json();
       if (!Array.isArray(currentScores)) currentScores = [];
@@ -326,7 +331,8 @@ import Layout from '../layouts/Layout.astro';
       const putRes = await fetch(BIN_URL, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
         },
         body: JSON.stringify(updatedScores)
       });
@@ -423,7 +429,9 @@ import Layout from '../layouts/Layout.astro';
     if (!enteredNickname) return;
 
     try {
-      const res = await fetch(BIN_URL);
+      const res = await fetch(`${BIN_URL}?nocache=${Date.now()}`, {
+        cache: 'no-store'
+      });
       const data: Hacker[] = await res.json();
       const existing = data.find(h => h.name.toLowerCase() === enteredNickname.toLowerCase());
 
