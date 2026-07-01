@@ -26,7 +26,19 @@
             </div>
             <div class="channel-details">
               <span class="channel-lbl">DIRECT EMAIL</span>
-              <a href="mailto:3lectricpenguin@gmail.com" class="channel-val">3lectricpenguin@gmail.com</a>
+              <button id="copy-email-btn" class="channel-val copy-email-btn" type="button" data-email="3lectricpenguin@gmail.com" aria-label="Copy email address">
+                <span class="email-text">3lectricpenguin@gmail.com</span>
+                <span class="copy-icon-wrapper">
+                  <svg class="copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  <svg class="check-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </span>
+                <span class="copy-tooltip">Copy email</span>
+              </button>
             </div>
           </div>
 
@@ -165,6 +177,33 @@
       });
     });
   }
+
+  const copyBtn = document.getElementById('copy-email-btn');
+  if (copyBtn) {
+    const emailText = copyBtn.getAttribute('data-email') || '3lectricpenguin@gmail.com';
+    const copyIcon = copyBtn.querySelector('.copy-icon') as HTMLElement;
+    const checkIcon = copyBtn.querySelector('.check-icon') as HTMLElement;
+    const tooltip = copyBtn.querySelector('.copy-tooltip') as HTMLElement;
+
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(emailText).then(() => {
+        if (tooltip) tooltip.textContent = 'Copied!';
+        copyBtn.classList.add('copied');
+        if (copyIcon) copyIcon.style.display = 'none';
+        if (checkIcon) checkIcon.style.display = 'inline';
+
+        setTimeout(() => {
+          copyBtn.classList.remove('copied');
+          if (tooltip) tooltip.textContent = 'Copy email';
+          if (copyIcon) copyIcon.style.display = 'inline';
+          if (checkIcon) checkIcon.style.display = 'none';
+        }, 2000);
+      }).catch(err => {
+        console.error('Failed to copy email: ', err);
+        if (tooltip) tooltip.textContent = 'Failed to copy';
+      });
+    });
+  }
 </script>
 
 <style>
@@ -285,6 +324,88 @@
   a.channel-val:hover {
     color: var(--accent-green);
     text-shadow: 0 0 5px rgba(163, 230, 53, 0.2);
+  }
+
+  /* Copy Email Button Styling */
+  .copy-email-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+    transition: color 0.3s;
+    text-align: left;
+  }
+
+  .copy-email-btn:hover {
+    color: var(--accent-green);
+    text-shadow: 0 0 5px rgba(163, 230, 53, 0.2);
+  }
+
+  .copy-icon-wrapper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    transition: color 0.3s;
+  }
+
+  .copy-email-btn:hover .copy-icon-wrapper {
+    color: var(--accent-green);
+  }
+
+  .copy-tooltip {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: var(--bg-tertiary);
+    border: 1px solid rgba(163, 230, 53, 0.3);
+    color: var(--accent-green);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-family: var(--font-display);
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 10;
+  }
+
+  .copy-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 4px;
+    border-style: solid;
+    border-color: rgba(163, 230, 53, 0.3) transparent transparent transparent;
+  }
+
+  .copy-email-btn:hover .copy-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .copy-email-btn.copied .copy-tooltip {
+    background: var(--accent-green);
+    color: #060814;
+    border-color: var(--accent-green);
+  }
+
+  .copy-email-btn.copied .copy-tooltip::after {
+    border-top-color: var(--accent-green);
   }
 
   /* Privacy Box Styling */
