@@ -241,8 +241,18 @@ import Layout from '../layouts/Layout.astro';
     lastActiveAt?: number; // timestamp in ms
   }
 
+  // --- DATABASE CONFIGURATION ---
+  // If credentials are provided below, the site connects to a real Supabase database.
+  // Otherwise, it falls back to the anonymous ExtendsClass JSON bin.
+  const SUPABASE_URL = ''; // Paste your Supabase project URL here
+  const SUPABASE_ANON_KEY = ''; // Paste your Supabase Anon Key here
   const BIN_URL = 'https://extendsclass.com/api/json-storage/bin/bafcada';
+  
   let hackers: Hacker[] = [];
+
+  function isSupabaseConfigured() {
+    return SUPABASE_URL.trim() !== '' && SUPABASE_ANON_KEY.trim() !== '';
+  }
 
   // Helper to remove any competitor who has remained at 0 points for 24 hours (86,400,000 ms)
   function cleanupStaleUsers(scores: Hacker[]): { updatedScores: Hacker[], modified: boolean } {
@@ -267,108 +277,222 @@ import Layout from '../layouts/Layout.astro';
   }
 
   async function fetchScores() {
-    try {
-      const res = await fetch(`${BIN_URL}?nocache=${Date.now()}`, {
-        cache: 'no-store'
-      });
-      if (!res.ok) throw new Error('Failed to fetch leaderboard data');
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        const { updatedScores, modified } = cleanupStaleUsers(data);
+    if (isSupabaseConfigured()) {
+      try {
+        // Prune stale users: points = 0 AND created_at older than 24 hours
+        const threshold = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        await fetch(`${SUPABASE_URL}/rest/v1/leaderboard?points=eq.0&created_at=lt.${threshold}`, {
+          method: 'DELETE',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+          }
+        });
+
+        // Fetch leaderboard rows
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/leaderboard?select=*`, {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Cache-Control': 'no-cache'
+          }
+        });
+        if (!res.ok) throw new Error('Supabase fetch failed: ' + res.statusText);
+        const data = await res.json();
         
-        // Broadcast solutions by other real players in the system logs feed
-        if (hackers.length > 0) {
-          updatedScores.forEach(newHacker => {
-            if (nickname && newHacker.name.toLowerCase() === nickname.toLowerCase()) {
-              return;
-            }
-            const oldHacker = hackers.find(h => h.name.toLowerCase() === newHacker.name.toLowerCase());
-            if (oldHacker) {
-              const scoreDiff = newHacker.points - oldHacker.points;
-              if (scoreDiff > 0) {
-                addLog(`[LIVE BROADCAST] Operator "${newHacker.name}" secured a node (+${scoreDiff} pts)`, 'alert');
+        if (Array.isArray(data)) {
+          const mappedScores: Hacker[] = data.map((row: any) => ({
+            name: row.name,
+            points: Number(row.points),
+            time: Number(row.time),
+            solvedCount: Number(row.solved_count),
+            createdAt: new Date(row.created_at).getTime(),
+            lastActiveAt: new Date(row.last_active_at).getTime()
+          }));
+
+          // Broadcast alert logs
+          if (hackers.length > 0) {
+            mappedScores.forEach(newHacker => {
+              if (nickname && newHacker.name.toLowerCase() === nickname.toLowerCase()) {
+                return;
               }
-            } else if (newHacker.points > 0) {
-              addLog(`[LIVE BROADCAST] Operator "${newHacker.name}" joined the matrix with ${newHacker.points} pts`, 'alert');
-            }
-          });
-        }
+              const oldHacker = hackers.find(h => h.name.toLowerCase() === newHacker.name.toLowerCase());
+              if (oldHacker) {
+                const scoreDiff = newHacker.points - oldHacker.points;
+                if (scoreDiff > 0) {
+                  addLog(`[LIVE BROADCAST] Operator "${newHacker.name}" secured a node (+${scoreDiff} pts)`, 'alert');
+                }
+              } else if (newHacker.points > 0) {
+                addLog(`[LIVE BROADCAST] Operator "${newHacker.name}" joined the matrix with ${newHacker.points} pts`, 'alert');
+              }
+            });
+          }
 
-        hackers = updatedScores;
-        
-        // Self-healing: if the active player is missing from the database, re-save their score
-        const playerExists = updatedScores.some(h => nickname && h.name.toLowerCase() === nickname.toLowerCase());
-        if (!playerExists && nickname) {
-          const solvedCount = challenges.filter(c => c.solved).length;
-          saveScore(nickname, playerScore, playerTime, solvedCount);
-        }
+          hackers = mappedScores;
 
-        updateLeaderboard();
+          // Self-healing check
+          const playerExists = hackers.some(h => nickname && h.name.toLowerCase() === nickname.toLowerCase());
+          if (!playerExists && nickname) {
+            const solvedCount = challenges.filter(c => c.solved).length;
+            await saveScore(nickname, playerScore, playerTime, solvedCount);
+          }
 
-        // If stale users were cleaned up, sync the updated state back to the database
-        if (modified) {
-          await fetch(BIN_URL, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'Cache-Control': 'no-cache'
-            },
-            body: JSON.stringify(updatedScores)
-          });
+          updateLeaderboard();
         }
+      } catch (e) {
+        console.error('Supabase fetch scores error:', e);
       }
-    } catch (e) {
-      console.error('Error fetching scores:', e);
+    } else {
+      // Fallback: ExtendsClass
+      try {
+        const res = await fetch(`${BIN_URL}?nocache=${Date.now()}`, {
+          cache: 'no-store'
+        });
+        if (!res.ok) throw new Error('Failed to fetch leaderboard data');
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          const { updatedScores, modified } = cleanupStaleUsers(data);
+          
+          if (hackers.length > 0) {
+            updatedScores.forEach(newHacker => {
+              if (nickname && newHacker.name.toLowerCase() === nickname.toLowerCase()) {
+                return;
+              }
+              const oldHacker = hackers.find(h => h.name.toLowerCase() === newHacker.name.toLowerCase());
+              if (oldHacker) {
+                const scoreDiff = newHacker.points - oldHacker.points;
+                if (scoreDiff > 0) {
+                  addLog(`[LIVE BROADCAST] Operator "${newHacker.name}" secured a node (+${scoreDiff} pts)`, 'alert');
+                }
+              } else if (newHacker.points > 0) {
+                addLog(`[LIVE BROADCAST] Operator "${newHacker.name}" joined the matrix with ${newHacker.points} pts`, 'alert');
+              }
+            });
+          }
+
+          hackers = updatedScores;
+
+          const playerExists = hackers.some(h => nickname && h.name.toLowerCase() === nickname.toLowerCase());
+          if (!playerExists && nickname) {
+            const solvedCount = challenges.filter(c => c.solved).length;
+            await saveScore(nickname, playerScore, playerTime, solvedCount);
+          }
+
+          updateLeaderboard();
+
+          if (modified) {
+            await fetch(BIN_URL, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache'
+              },
+              body: JSON.stringify(updatedScores)
+            });
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching scores from fallback:', e);
+      }
     }
   }
 
   async function saveScore(name: string, points: number, time: number, solvedCount: number) {
-    try {
-      const res = await fetch(`${BIN_URL}?nocache=${Date.now()}`, {
-        cache: 'no-store'
-      });
-      if (!res.ok) throw new Error('Failed to fetch current scores');
-      let currentScores: Hacker[] = await res.json();
-      if (!Array.isArray(currentScores)) currentScores = [];
-
-      const now = Date.now();
-      const existingPlayer = currentScores.find(h => h.name.toLowerCase() === name.toLowerCase());
-      if (existingPlayer) {
-        existingPlayer.name = name;
-        existingPlayer.points = points;
-        existingPlayer.time = time;
-        existingPlayer.solvedCount = solvedCount;
-        existingPlayer.lastActiveAt = now;
-        if (!existingPlayer.createdAt) {
-          existingPlayer.createdAt = now;
-        }
-      } else {
-        currentScores.push({
-          name,
-          points,
-          time,
-          solvedCount,
-          createdAt: now,
-          lastActiveAt: now
+    if (isSupabaseConfigured()) {
+      try {
+        // Upsert record (insert or update on conflict of primary key 'name')
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/leaderboard`, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify({
+            name: name,
+            points: points,
+            time: time,
+            solved_count: solvedCount,
+            last_active_at: new Date().toISOString()
+          })
         });
+        if (!res.ok) throw new Error('Supabase save failed: ' + res.statusText);
+        
+        // Refresh local hacker state
+        const getRes = await fetch(`${SUPABASE_URL}/rest/v1/leaderboard?select=*`, {
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Cache-Control': 'no-cache'
+          }
+        });
+        if (getRes.ok) {
+          const data = await getRes.json();
+          if (Array.isArray(data)) {
+            hackers = data.map((row: any) => ({
+              name: row.name,
+              points: Number(row.points),
+              time: Number(row.time),
+              solvedCount: Number(row.solved_count),
+              createdAt: new Date(row.created_at).getTime(),
+              lastActiveAt: new Date(row.last_active_at).getTime()
+            }));
+            updateLeaderboard();
+          }
+        }
+      } catch (e) {
+        console.error('Supabase save score error:', e);
       }
+    } else {
+      // Fallback: ExtendsClass
+      try {
+        const res = await fetch(`${BIN_URL}?nocache=${Date.now()}`, {
+          cache: 'no-store'
+        });
+        if (!res.ok) throw new Error('Failed to fetch current scores');
+        let currentScores: Hacker[] = await res.json();
+        if (!Array.isArray(currentScores)) currentScores = [];
 
-      const { updatedScores } = cleanupStaleUsers(currentScores);
+        const now = Date.now();
+        const existingPlayer = currentScores.find(h => h.name.toLowerCase() === name.toLowerCase());
+        if (existingPlayer) {
+          existingPlayer.name = name;
+          existingPlayer.points = points;
+          existingPlayer.time = time;
+          existingPlayer.solvedCount = solvedCount;
+          existingPlayer.lastActiveAt = now;
+          if (!existingPlayer.createdAt) {
+            existingPlayer.createdAt = now;
+          }
+        } else {
+          currentScores.push({
+            name,
+            points,
+            time,
+            solvedCount,
+            createdAt: now,
+            lastActiveAt: now
+          });
+        }
 
-      const putRes = await fetch(BIN_URL, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache'
-        },
-        body: JSON.stringify(updatedScores)
-      });
-      if (!putRes.ok) throw new Error('Failed to save scores');
-      
-      hackers = updatedScores;
-      updateLeaderboard();
-    } catch (e) {
-      console.error('Error saving score:', e);
+        const { updatedScores } = cleanupStaleUsers(currentScores);
+
+        const putRes = await fetch(BIN_URL, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache'
+          },
+          body: JSON.stringify(updatedScores)
+        });
+        if (!putRes.ok) throw new Error('Failed to save scores');
+        
+        hackers = updatedScores;
+        updateLeaderboard();
+      } catch (e) {
+        console.error('Error saving score to fallback:', e);
+      }
     }
   }
 
@@ -547,6 +671,14 @@ import Layout from '../layouts/Layout.astro';
 
     // Fetch scores from API periodically
     setInterval(fetchScores, 5000);
+
+    // Print active database status
+    if (isSupabaseConfigured()) {
+      addLog(`[SYSTEM] Production DB Link Active: Connected to Supabase Cloud.`, 'success');
+    } else {
+      addLog(`[SYSTEM] Dev DB Link Active: Connected to ExtendsClass Fallback REST Bin.`, 'system');
+      addLog(`[SYSTEM] Paste your Supabase URL & Anon Key at the top of ctf.astro script to upgrade database.`, 'warning');
+    }
   }
 
   function updateTimerDisplay() {
