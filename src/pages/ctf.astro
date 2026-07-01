@@ -35,6 +35,7 @@ import Layout from '../layouts/Layout.astro';
             <div class="input-wrapper">
               <label for="operator-password">PASSWORD <span class="muted-label">(OPTIONAL - PERSISTS YOUR PROFILE)</span></label>
               <input type="password" id="operator-password" placeholder="Leave blank to enter as Guest" autocomplete="off" />
+              <span class="pwd-requirement-hint">Min 8 chars, 1 upper, 1 lower, 1 number, 1 special char</span>
               <span class="input-focus-line"></span>
             </div>
             <div class="form-feedback error-text" id="entry-feedback-msg" style="display: none;"></div>
@@ -629,6 +630,36 @@ import Layout from '../layouts/Layout.astro';
     if (!enteredNickname) return;
 
     const enteredPassword = passwordInput.value;
+    
+    // Validate password complexity rules if a password is provided (Guests can leave it blank)
+    if (enteredPassword) {
+      if (enteredPassword.length < 8) {
+        entryFeedback.style.display = 'block';
+        entryFeedback.textContent = '❌ Password must be at least 8 characters long.';
+        return;
+      }
+      if (!/[A-Z]/.test(enteredPassword)) {
+        entryFeedback.style.display = 'block';
+        entryFeedback.textContent = '❌ Password must contain at least one uppercase letter.';
+        return;
+      }
+      if (!/[a-z]/.test(enteredPassword)) {
+        entryFeedback.style.display = 'block';
+        entryFeedback.textContent = '❌ Password must contain at least one lowercase letter.';
+        return;
+      }
+      if (!/[0-9]/.test(enteredPassword)) {
+        entryFeedback.style.display = 'block';
+        entryFeedback.textContent = '❌ Password must contain at least one number.';
+        return;
+      }
+      if (!/[^A-Za-z0-9]/.test(enteredPassword)) {
+        entryFeedback.style.display = 'block';
+        entryFeedback.textContent = '❌ Password must contain at least one special character.';
+        return;
+      }
+    }
+
     const pwdHash = await hashPassword(enteredPassword);
 
     entryFeedback.style.display = 'none';
@@ -1365,6 +1396,15 @@ import Layout from '../layouts/Layout.astro';
     color: var(--accent-green);
     text-transform: uppercase;
     opacity: 0.75;
+  }
+
+  .pwd-requirement-hint {
+    font-family: var(--font-mono);
+    font-size: 0.55rem;
+    color: var(--text-muted);
+    margin-top: 0.4rem;
+    display: block;
+    opacity: 0.7;
   }
 
   .form-feedback {
