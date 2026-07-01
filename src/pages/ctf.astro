@@ -391,12 +391,17 @@ import Layout from '../layouts/Layout.astro';
       
       card.innerHTML = `
         <div class="selector-meta">
-          <span class="cat">${challenge.category}</span>
-          <span class="pts">${challenge.points} pts</span>
+          <span class="cat">${challenge.category.toUpperCase()}</span>
+          <span class="pts">${challenge.points} PTS</span>
         </div>
         <h4 class="selector-title">${challenge.title}</h4>
-        <div class="selector-status">
-          ${challenge.solved ? '● SECURED' : '○ ONLINE'}
+        <div class="selector-footer">
+          <span class="selector-status-text">
+            ${challenge.solved ? '● SECURED' : '○ DISCONNECTED'}
+          </span>
+          <span class="selector-action-btn">
+            ${challenge.solved ? 'REVIEW' : 'CONNECT ❯'}
+          </span>
         </div>
       `;
 
@@ -1305,22 +1310,27 @@ import Layout from '../layouts/Layout.astro';
   }
 
   .challenge-selector-card {
-    background: rgba(17, 19, 28, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    position: relative;
+    background: linear-gradient(135deg, rgba(24, 28, 40, 0.8) 0%, rgba(17, 19, 28, 0.95) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-left: 4px solid rgba(255, 255, 255, 0.15);
     border-radius: 6px;
     padding: 1.25rem;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    gap: 1rem;
+    gap: 1.2rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   }
 
   .challenge-selector-card:hover {
-    border-color: rgba(163, 230, 53, 0.3);
-    background: rgba(163, 230, 53, 0.02);
-    transform: translateY(-2px);
+    border-color: rgba(163, 230, 53, 0.4);
+    border-left-color: var(--accent-green);
+    background: linear-gradient(135deg, rgba(28, 32, 48, 0.8) 0%, rgba(20, 24, 36, 0.95) 100%);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(163, 230, 53, 0.12);
   }
 
   .challenge-selector-card:active {
@@ -1329,13 +1339,20 @@ import Layout from '../layouts/Layout.astro';
 
   .challenge-selector-card.active {
     border-color: var(--accent-green);
-    background: rgba(163, 230, 53, 0.04);
-    box-shadow: 0 0 15px rgba(163, 230, 53, 0.1);
+    border-left-color: var(--accent-green);
+    background: rgba(163, 230, 53, 0.05);
+    box-shadow: 0 0 20px rgba(163, 230, 53, 0.25);
   }
 
   .challenge-selector-card.solved {
-    border-color: rgba(163, 230, 53, 0.2);
-    background: rgba(163, 230, 53, 0.01);
+    border-left-color: #10b981; /* Emerald Green */
+  }
+
+  .challenge-selector-card.solved.active {
+    border-color: #10b981;
+    border-left-color: #10b981;
+    background: rgba(16, 185, 129, 0.05);
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.25);
   }
 
   .selector-meta {
@@ -1359,6 +1376,10 @@ import Layout from '../layouts/Layout.astro';
     color: var(--accent-green);
   }
 
+  .solved .selector-meta .pts {
+    color: #10b981;
+  }
+
   .selector-title {
     font-family: var(--font-display);
     font-size: 0.9rem;
@@ -1367,15 +1388,59 @@ import Layout from '../layouts/Layout.astro';
     line-height: 1.3;
   }
 
-  .selector-status {
+  .selector-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px dashed rgba(255, 255, 255, 0.05);
+    padding-top: 0.75rem;
+    margin-top: auto;
+  }
+
+  .selector-status-text {
     font-family: monospace;
     font-size: 0.65rem;
     font-weight: bold;
     color: var(--text-muted);
   }
 
-  .solved .selector-status {
+  .solved .selector-status-text {
+    color: #10b981;
+  }
+
+  .active .selector-status-text {
     color: var(--accent-green);
+  }
+
+  .solved.active .selector-status-text {
+    color: #10b981;
+  }
+
+  .selector-action-btn {
+    font-family: var(--font-display);
+    font-size: 0.65rem;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    transition: all 0.3s;
+  }
+
+  .challenge-selector-card:hover .selector-action-btn {
+    color: var(--accent-green);
+    text-shadow: 0 0 8px rgba(163, 230, 53, 0.4);
+  }
+
+  .challenge-selector-card.solved:hover .selector-action-btn {
+    color: #10b981;
+    text-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+  }
+
+  .challenge-selector-card.active .selector-action-btn {
+    color: var(--accent-green);
+  }
+
+  .challenge-selector-card.solved.active .selector-action-btn {
+    color: #10b981;
   }
 
   /* Challenge Details Panel */
