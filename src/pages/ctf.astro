@@ -295,6 +295,14 @@ import Layout from '../layouts/Layout.astro';
         }
 
         hackers = updatedScores;
+        
+        // Self-healing: if the active player is missing from the database, re-save their score
+        const playerExists = updatedScores.some(h => nickname && h.name.toLowerCase() === nickname.toLowerCase());
+        if (!playerExists && nickname) {
+          const solvedCount = challenges.filter(c => c.solved).length;
+          saveScore(nickname, playerScore, playerTime, solvedCount);
+        }
+
         updateLeaderboard();
 
         // If stale users were cleaned up, sync the updated state back to the database
@@ -438,6 +446,9 @@ import Layout from '../layouts/Layout.astro';
 
       startTime = Date.now() - (playerTime * 1000);
       await startWorkspace();
+      
+      // Sync local score to database immediately on session load
+      await saveScore(nickname, playerScore, playerTime, solvedIds.length);
     }
   }
 
